@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/gorilla/feeds"
 	"html/template"
 	"io/ioutil"
 	"os"
@@ -88,6 +89,17 @@ func (post Page) PostHTML(t *template.Template) template.HTML {
 	t.ExecuteTemplate(w, "post.html", post)
 	w.Flush()
 	return template.HTML(string(buf.Bytes()))
+}
+
+func (post Page) FeedItem() *feeds.Item {
+	return &feeds.Item{
+		Title:       post.Title,
+		Link:        &feeds.Link{Href: fmt.Sprintf("http://thomasdenney.co.uk/%s", post.PostPath())},
+		Description: string(post.Contents),
+		Created:     post.Time(),
+		Author: &feeds.Author{
+			Name:  "Thomas Denney",
+			Email: "me@thomasdenney.co.uk"}}
 }
 
 func clean() {
@@ -247,6 +259,30 @@ func makeBlogPages(t *template.Template, posts []Page) {
 	}
 }
 
+func makeFeed(posts []Page) {
+	feed := &feeds.Feed{
+		Title:       "Thomas Denney",
+		Link:        &feeds.Link{Href: "http://thomasdenney.co.uk"},
+		Description: "Personal blog of a computer science student and app developer",
+		Author: &feeds.Author{
+			Name:  "Thomas Denney",
+			Email: "me@thomasdenney.co.uk"}}
+	items := make([]*feeds.Item, 0)
+	for i := len(posts) - 1; i >= 0 && i >= len(posts)-10; i-- {
+		items = append(items, posts[i].FeedItem())
+	}
+	feed.Items = items
+	rss, err := feed.ToRss()
+	if err != nil {
+		panic(err)
+	}
+	err = ioutil.WriteFile(path.Join("static", "feed.xml"), []byte(rss), 0777)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Created RSS feed")
+}
+
 func makeBlog(t *template.Template) {
 	posts := findPages("posts")
 	replaceDatesInPath := regexp.MustCompile(`([0-9]{4})-([0-9]{2})-([0-9]{2})-`)
@@ -265,6 +301,7 @@ func makeBlog(t *template.Template) {
 		writePage(t, post, post.PostPath(), "Post", post.PostPath2())
 	}
 	makeBlogPages(t, posts)
+	makeFeed(posts)
 }
 
 func init() {
