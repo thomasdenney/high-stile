@@ -2,13 +2,17 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/russross/blackfriday"
 	"html/template"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path"
 )
+
+var serve = flag.Bool("serve", false, "Serve the contents of static after run")
 
 type Page struct {
 	Title      string
@@ -108,6 +112,10 @@ func makePages(t *template.Template) {
 	}
 }
 
+func init() {
+	flag.Parse()
+}
+
 func main() {
 	fmt.Println("High Stile: A static site generator")
 	clean()
@@ -119,4 +127,8 @@ func main() {
 
 	makePages(t)
 
+	if *serve {
+		fmt.Println("Begin serving on port 8080")
+		panic(http.ListenAndServe(":8080", http.FileServer(http.Dir("static"))))
+	}
 }
