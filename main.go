@@ -223,6 +223,9 @@ func makeBlogPages(t *template.Template, posts []Page) {
 			pages[i].HasOlder = true
 			pages[i].Older = fmt.Sprintf("/blog/page/%d", i+2)
 		}
+		if i == 1 {
+			pages[i].Newer = "/"
+		}
 	}
 	for i, page := range pages {
 		var buf bytes.Buffer
@@ -234,7 +237,13 @@ func makeBlogPages(t *template.Template, posts []Page) {
 			Title:    fmt.Sprintf("Page %d", i+1),
 			Contents: contents,
 			Path:     fmt.Sprintf("/blog/page/%d", i+1)}
-		writePage(t, outPage, outPage.Path, "Paginated page")
+		if i == 0 {
+			outPage.Title = "Blog"
+			outPage.IsHomepage = true
+			writePage(t, outPage, outPage.Path, "Paginated page", "blog", "")
+		} else {
+			writePage(t, outPage, outPage.Path, "Paginated page")
+		}
 	}
 }
 
