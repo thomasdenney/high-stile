@@ -177,18 +177,27 @@ func makePages(t *template.Template) {
 	}
 }
 
-func writePage(t *template.Template, page Page, outPath string, kind string) {
-	err := os.MkdirAll(path.Join("static", outPath), 0777)
+func writePage(t *template.Template, page Page, outPath string, kind string, links ...string) {
+	outPath = path.Join("static", outPath, "index.html")
+	err := os.MkdirAll(path.Dir(outPath), 0777)
 	if err != nil {
 		panic(err)
 	}
-	f, err := os.Create(path.Join("static", outPath, "index.html"))
+	f, err := os.Create(outPath)
 	if err != nil {
 		panic(err)
 	}
 	defer f.Close()
 	t.ExecuteTemplate(f, "page.html", page)
 	fmt.Println(kind, page.Title, "created at", outPath)
+
+	for _, link := range links {
+		link = path.Join("static", link, "index.html")
+		dir := path.Dir(link)
+		os.MkdirAll(dir, 0777)
+		os.Link(outPath, link)
+		fmt.Println(" >", link)
+	}
 }
 
 func makeBlogPages(t *template.Template, posts []Page) {
@@ -244,8 +253,7 @@ func makeBlog(t *template.Template) {
 	for _, post := range posts {
 		post.ShowHistory = true
 		post.Contents = post.PostHTML(t)
-		writePage(t, post, post.PostPath(), "Post")
-		writePage(t, post, post.PostPath2(), "Post")
+		writePage(t, post, post.PostPath(), "Post", post.PostPath2())
 	}
 	makeBlogPages(t, posts)
 }
