@@ -4,19 +4,26 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"flag"
 	"fmt"
-	"github.com/shurcooL/github_flavored_markdown"
 	"html/template"
 	"io/ioutil"
-	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"regexp"
 	"time"
 )
 
-var serve = flag.Bool("serve", false, "Serve the contents of static after run")
+func markdownToHTML(markdownPath string) (template.HTML, error) {
+	cmd := exec.Command("pandoc", "-f", "markdown", "-t", "html", markdownPath)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		return "", err
+	}
+	return template.HTML(out.String()), nil
+}
 
 type Page struct {
 	Title       string
@@ -55,6 +62,14 @@ func (page Page) PostPath2() string {
 func (page Page) PrettyDate() string {
 	t := page.Time()
 	return fmt.Sprintf("%s %d, %d", t.Month().String(), t.Day(), t.Year())
+}
+
+func (post Page) PostHTML(t *template.Template) template.HTML {
+	var buf bytes.Buffer
+	w := bufio.NewWriter(&buf)
+	t.ExecuteTemplate(w, "post.html", post)
+	w.Flush()
+	return template.HTML(string(buf.Bytes()))
 }
 
 func clean() {
@@ -96,20 +111,25 @@ func findPages(dir string) []Page {
 		if path.Ext(fileName) == ".html" || path.Ext(fileName) == ".md" {
 			fullPath := path.Join(dir, fileName)
 			justName := fileName[:len(fileName)-len(path.Ext(fileName))]
-			contents, err := ioutil.ReadFile(fullPath)
-
-			if err != nil {
-				panic(err)
-			}
-
-			//Parse Markdown, if necessary
-			if path.Ext(fileName) == ".md" {
-				contents = github_flavored_markdown.Markdown(contents)
-			}
 
 			var page Page
 
-			page.Contents = template.HTML(string(contents))
+			//Parse Markdown, if necessary
+			if path.Ext(fileName) == ".md" {
+				contents, err := markdownToHTML(fullPath)
+				if err != nil {
+					panic(err)
+				}
+				page.Contents = contents
+			} else {
+				contents, err := ioutil.ReadFile(fullPath)
+
+				if err != nil {
+					panic(err)
+				}
+				page.Contents = template.HTML(string(contents))
+			}
+
 			page.Path = justName
 			page.IsHomepage = false
 
@@ -163,22 +183,14 @@ func makeBlog(t *template.Template) {
 		if i < len(posts)-1 {
 			posts[i].Next = &posts[i+1]
 		}
-		posts[i].ShowHistory = true
 		posts[i].Path = replaceDatesInPath.ReplaceAllString(posts[i].Path, "")
 	}
 	for _, post := range posts {
-		var buf bytes.Buffer
-		w := bufio.NewWriter(&buf)
-		t.ExecuteTemplate(w, "post.html", post)
-		w.Flush()
-		post.Contents = template.HTML(string(buf.Bytes()))
+		post.ShowHistory = true
+		post.Contents = post.PostHTML(t)
 		writePage(t, post, post.PostPath(), "Post")
 		writePage(t, post, post.PostPath2(), "Post")
 	}
-}
-
-func init() {
-	flag.Parse()
 }
 
 func main() {
@@ -192,9 +204,4 @@ func main() {
 
 	makePages(t)
 	makeBlog(t)
-
-	if *serve {
-		fmt.Println("Begin serving on port 8080")
-		panic(http.ListenAndServe(":8080", http.FileServer(http.Dir("static"))))
-	}
 }
