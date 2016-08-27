@@ -173,6 +173,44 @@ func writePage(t *template.Template, page Page, outPath string, kind string) {
 	fmt.Println(kind, page.Title, "created at", outPath)
 }
 
+func makeBlogPages(t *template.Template, posts []Page) {
+	type PaginatedPage struct {
+		Posts              []template.HTML
+		HasNewer, HasOlder bool
+		Newer, Older       string
+	}
+	pages := make([]PaginatedPage, 0)
+	for i := len(posts) - 1; i >= 0; i-- {
+		if (len(pages) == 0) || (len(pages[len(pages)-1].Posts) == 10) {
+			pages = append(pages, PaginatedPage{})
+		}
+		pages[len(pages)-1].Posts = append(pages[len(pages)-1].Posts, posts[i].PostHTML(t))
+	}
+
+	for i, _ := range pages {
+		if i > 0 {
+			pages[i].HasNewer = true
+			pages[i].Newer = fmt.Sprintf("/blog/page/%d", i)
+		}
+		if i < len(pages)-1 {
+			pages[i].HasOlder = true
+			pages[i].Older = fmt.Sprintf("/blog/page/%d", i+2)
+		}
+	}
+	for i, page := range pages {
+		var buf bytes.Buffer
+		w := bufio.NewWriter(&buf)
+		t.ExecuteTemplate(w, "paginate.html", page)
+		w.Flush()
+		contents := template.HTML(string(buf.Bytes()))
+		outPage := Page{
+			Title:    fmt.Sprintf("Page %d", i+1),
+			Contents: contents,
+			Path:     fmt.Sprintf("/blog/page/%d", i+1)}
+		writePage(t, outPage, outPage.Path, "Paginated page")
+	}
+}
+
 func makeBlog(t *template.Template) {
 	posts := findPages("posts")
 	replaceDatesInPath := regexp.MustCompile(`([0-9]{4})-([0-9]{2})-([0-9]{2})-`)
@@ -191,13 +229,14 @@ func makeBlog(t *template.Template) {
 		writePage(t, post, post.PostPath(), "Post")
 		writePage(t, post, post.PostPath2(), "Post")
 	}
+	makeBlogPages(t, posts)
 }
 
 func main() {
 	fmt.Println("High Stile: A static site generator")
 	clean()
 	linkStaticFiles()
-	t, err := template.ParseFiles("templates/page.html", "templates/post.html")
+	t, err := template.ParseFiles("templates/page.html", "templates/post.html", "templates/paginate.html")
 	if err != nil {
 		panic(err)
 	}
