@@ -19,10 +19,7 @@ type Page struct {
 	Path       string
 	Contents   template.HTML
 	IsHomepage bool
-}
-
-type PageMetadata struct {
-	Title string
+	Date       string
 }
 
 func clean() {
@@ -53,8 +50,8 @@ func linkStaticFiles() {
 	}
 }
 
-func makePages(t *template.Template) {
-	files, err := ioutil.ReadDir("pages")
+func findPages(dir string) []Page {
+	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		panic(err)
 	}
@@ -62,7 +59,7 @@ func makePages(t *template.Template) {
 	for _, file := range files {
 		fileName := file.Name()
 		if path.Ext(fileName) == ".html" || path.Ext(fileName) == ".md" {
-			fullPath := path.Join("pages", fileName)
+			fullPath := path.Join(dir, fileName)
 			justName := fileName[:len(fileName)-len(path.Ext(fileName))]
 			contents, err := ioutil.ReadFile(fullPath)
 
@@ -75,21 +72,21 @@ func makePages(t *template.Template) {
 				contents = github_flavored_markdown.Markdown(contents)
 			}
 
-			page := Page{
-				Path:       justName,
-				Contents:   template.HTML(string(contents)),
-				IsHomepage: false}
+			var page Page
 
-			jsonPath := path.Join("pages", justName+".json")
+			page.Contents = template.HTML(string(contents))
+			page.Path = justName
+			page.IsHomepage = false
+
+			jsonPath := path.Join(dir, justName+".json")
 			if _, existsErr := os.Stat(jsonPath); existsErr == nil {
-				var metadata PageMetadata
 				jsonContents, err := ioutil.ReadFile(jsonPath)
 				if err != nil {
 					panic(err)
 				}
-				jsonErr := json.Unmarshal(jsonContents, &metadata)
-				if jsonErr == nil {
-					page.Title = metadata.Title
+				jsonErr := json.Unmarshal(jsonContents, &page)
+				if jsonErr != nil {
+					panic(jsonErr)
 				}
 			}
 
@@ -97,6 +94,11 @@ func makePages(t *template.Template) {
 		}
 	}
 
+	return pages
+}
+
+func makePages(t *template.Template) {
+	pages := findPages("pages")
 	for _, page := range pages {
 		err := os.MkdirAll(path.Join("static", page.Path), 0777)
 		if err != nil {
