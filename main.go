@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -14,14 +15,31 @@ import (
 	"time"
 )
 
+var ignoreCache = flag.Bool("ignore-cache", false, "Ignores any cached HTML files, choosing to regenerate them")
+
 func markdownToHTML(markdownPath string) (template.HTML, error) {
+	mdStat, _ := os.Stat(markdownPath)
+	dir := path.Dir(markdownPath)
+	cacheDir := path.Join(dir, "_cache")
+	basePath := path.Base(markdownPath)
+	basePath = basePath[:len(basePath)-len(path.Ext(basePath))] + ".html"
+	cachePath := path.Join(cacheDir, basePath)
+	cacheStat, err := os.Stat(cachePath)
+	if err == nil && !(*ignoreCache) {
+		if mdStat.ModTime().Before(cacheStat.ModTime()) {
+			bs, err := ioutil.ReadFile(cachePath)
+			return template.HTML(bs), err
+		}
+	}
 	cmd := exec.Command("pandoc", "-f", "markdown", "-t", "html", markdownPath)
 	var out bytes.Buffer
 	cmd.Stdout = &out
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		return "", err
 	}
+	os.MkdirAll(cacheDir, 0777)
+	ioutil.WriteFile(cachePath, out.Bytes(), 0777)
 	return template.HTML(out.String()), nil
 }
 
@@ -230,6 +248,10 @@ func makeBlog(t *template.Template) {
 		writePage(t, post, post.PostPath2(), "Post")
 	}
 	makeBlogPages(t, posts)
+}
+
+func init() {
+	flag.Parse()
 }
 
 func main() {
