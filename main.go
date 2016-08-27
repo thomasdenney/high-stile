@@ -32,6 +32,23 @@ func clean() {
 	}
 }
 
+func symlinkStaticFiles() {
+	files, err := ioutil.ReadDir("public")
+	if err != nil {
+		panic(err)
+	}
+	for _, file := range files {
+		oldPath := path.Join("public", file.Name())
+		newPath := path.Join("static", file.Name())
+		symLinkErr := os.Symlink(oldPath, newPath)
+		if symLinkErr != nil {
+			panic(symLinkErr)
+		} else {
+			fmt.Println("Link", oldPath, "to", newPath)
+		}
+	}
+}
+
 func makePages(t *template.Template) {
 	files, err := ioutil.ReadDir("pages")
 	if err != nil {
@@ -94,6 +111,7 @@ func makePages(t *template.Template) {
 func main() {
 	fmt.Println("High Stile: A static site generator")
 	clean()
+	symlinkStaticFiles()
 	t, err := template.ParseFiles("templates/page.html")
 	if err != nil {
 		panic(err)
