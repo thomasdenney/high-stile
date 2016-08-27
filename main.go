@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/russross/blackfriday"
+	"github.com/shurcooL/github_flavored_markdown"
 	"html/template"
 	"io/ioutil"
 	"net/http"
@@ -72,7 +72,7 @@ func makePages(t *template.Template) {
 
 			//Parse Markdown, if necessary
 			if path.Ext(fileName) == ".md" {
-				contents = blackfriday.MarkdownBasic(contents)
+				contents = github_flavored_markdown.Markdown(contents)
 			}
 
 			page := Page{
