@@ -44,6 +44,27 @@ func markdownToHTML(markdownPath string) (template.HTML, error) {
 	return template.HTML(out.String()), nil
 }
 
+type SiteInfo struct {
+	Title       string
+	Url         string
+	Email       string
+	Author      string
+	Description string
+}
+
+var site SiteInfo
+
+func readSiteInfo() {
+	bs, err := ioutil.ReadFile("config.json")
+	if err != nil {
+		fmt.Println("No config.json file")
+	}
+	jsonErr := json.Unmarshal(bs, &site)
+	if jsonErr != nil {
+		fmt.Println("Failed to parse config.json")
+	}
+}
+
 type Page struct {
 	Title       string
 	Path        string
@@ -94,12 +115,12 @@ func (post Page) PostHTML(t *template.Template) template.HTML {
 func (post Page) FeedItem() *feeds.Item {
 	return &feeds.Item{
 		Title:       post.Title,
-		Link:        &feeds.Link{Href: fmt.Sprintf("http://thomasdenney.co.uk/%s", post.PostPath())},
+		Link:        &feeds.Link{Href: fmt.Sprintf("%s/%s", site.Url, post.PostPath())},
 		Description: string(post.Contents),
 		Created:     post.Time(),
 		Author: &feeds.Author{
-			Name:  "Thomas Denney",
-			Email: "me@thomasdenney.co.uk"}}
+			Name:  site.Title,
+			Email: site.Email}}
 }
 
 func clean() {
@@ -261,12 +282,12 @@ func makeBlogPages(t *template.Template, posts []Page) {
 
 func makeFeed(posts []Page) {
 	feed := &feeds.Feed{
-		Title:       "Thomas Denney",
-		Link:        &feeds.Link{Href: "http://thomasdenney.co.uk"},
-		Description: "Personal blog of a computer science student and app developer",
+		Title:       site.Title,
+		Link:        &feeds.Link{Href: site.Url},
+		Description: site.Description,
 		Author: &feeds.Author{
-			Name:  "Thomas Denney",
-			Email: "me@thomasdenney.co.uk"}}
+			Name:  site.Author,
+			Email: site.Email}}
 	items := make([]*feeds.Item, 0)
 	for i := len(posts) - 1; i >= 0 && i >= len(posts)-10; i-- {
 		items = append(items, posts[i].FeedItem())
@@ -310,6 +331,7 @@ func init() {
 
 func main() {
 	fmt.Println("High Stile: A static site generator")
+	readSiteInfo()
 	clean()
 	linkStaticFiles()
 	t, err := template.ParseFiles("templates/page.html", "templates/post.html", "templates/paginate.html")
