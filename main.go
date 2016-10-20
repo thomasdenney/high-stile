@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -78,6 +79,12 @@ type Page struct {
 	Next        *Page
 	ShowHistory bool
 }
+
+type ByDate []Page
+
+func (a ByDate) Len() int           { return len(a) }
+func (a ByDate) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByDate) Less(i, j int) bool { return a[i].Time().Before(a[j].Time()) }
 
 func (page Page) HasNext() bool {
 	return page.Next != nil
@@ -309,6 +316,7 @@ func makeFeed(posts []Page) {
 
 func makeBlog(t *template.Template) {
 	posts := findPages("posts")
+	sort.Sort(ByDate(posts))
 	replaceDatesInPath := regexp.MustCompile(`([0-9]{4})-([0-9]{2})-([0-9]{2})-`)
 	for i, _ := range posts {
 		if i > 0 {
