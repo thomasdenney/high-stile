@@ -13,10 +13,13 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"strings"
 	"time"
 )
 
 var ignoreCache = flag.Bool("ignore-cache", false, "Ignores any cached HTML files, choosing to regenerate them")
+
+var newPostName string
 
 func markdownToHTML(markdownPath string) (template.HTML, error) {
 	mdStat, _ := os.Stat(markdownPath)
@@ -325,11 +328,43 @@ func makeBlog(t *template.Template) {
 	makeFeed(posts)
 }
 
+type PostMetadata struct {
+	Title string
+	Date  string
+}
+
+func createNewPostFile(title string) {
+	d := time.Now()
+	meta := PostMetadata{
+		Title: title,
+		Date:  d.Format("2006-01-02 15:04:05")}
+
+	filename := strings.ToLower(title)
+	whitespace := regexp.MustCompile(`\s`)
+	filename = whitespace.ReplaceAllString(filename, "-")
+	badChars := regexp.MustCompile(`[^\w\d-]*`)
+	filename = badChars.ReplaceAllString(filename, "")
+	filename = d.Format("2006-01-02") + "-" + filename
+
+	bs, err := json.Marshal(meta)
+	if err == nil {
+		ioutil.WriteFile(path.Join("posts", filename+".json"), bs, os.ModePerm)
+		f, err := os.Create(path.Join("posts", filename+".md"))
+		if err == nil {
+			defer f.Close()
+		}
+	}
+}
+
 func init() {
+	flag.StringVar(&newPostName, "new-post", "", "Creates a new blog post dated now")
 	flag.Parse()
 }
 
 func main() {
+	if len(newPostName) > 0 {
+		createNewPostFile(newPostName)
+	}
 	fmt.Println("High Stile: A static site generator")
 	readSiteInfo()
 	clean()
