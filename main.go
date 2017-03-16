@@ -72,6 +72,8 @@ func readSiteInfo() {
 type Page struct {
 	Title       string
 	Path        string
+	HeaderPath  string
+	Header      template.HTML
 	Contents    template.HTML
 	IsHomepage  bool
 	Date        string
@@ -203,6 +205,16 @@ func findPages(dir string) []Page {
 				jsonErr := json.Unmarshal(jsonContents, &page)
 				if jsonErr != nil {
 					panic(jsonErr)
+				}
+
+				// Resolve dependencies
+				if page.HeaderPath != "" {
+					page.HeaderPath = path.Join(dir, page.HeaderPath)
+					headerContents, err := ioutil.ReadFile(page.HeaderPath)
+					if err != nil {
+						panic(err)
+					}
+					page.Header = template.HTML(string(headerContents))
 				}
 			}
 
