@@ -54,6 +54,7 @@ type SiteInfo struct {
 	Email       string
 	Author      string
 	Description string
+	Avatar      string
 }
 
 var site SiteInfo
@@ -326,6 +327,66 @@ func makeFeed(posts []Page) {
 	fmt.Println("Created RSS feed")
 }
 
+type JsonFeedAuthor struct {
+	Name   string `json:"name"`
+	Url    string `json:"url"`
+	Avatar string `json:"avatar"`
+}
+
+type JsonFeedItem struct {
+	Id            string    `json:"id"`
+	Url           string    `json:"url"`
+	Title         string    `json:"title"`
+	ContentHTML   string    `json:"content_html"`
+	DatePublished time.Time `json:"date_published"`
+}
+
+func (post Page) JsonFeedItem() *JsonFeedItem {
+	return &JsonFeedItem{
+		Id:            post.PostPath(),
+		Title:         post.Title,
+		Url:           fmt.Sprintf("%s/%s", site.Url, post.PostPath()),
+		ContentHTML:   string(post.Contents),
+		DatePublished: post.Time()}
+}
+
+type JsonFeed struct {
+	Version     string          `json:"version"`
+	Title       string          `json:"version"`
+	HomePageUrl string          `json:"home_page_url"`
+	FeedUrl     string          `json:"feed_url"`
+	Items       []*JsonFeedItem `json:"items"`
+	Author      *JsonFeedAuthor `json:"author"`
+	Description string          `json:"description"`
+}
+
+func makeJsonFeed(posts []Page) {
+	feed := JsonFeed{
+		Version:     "https://jsonfeed.org/version/1",
+		Title:       site.Title,
+		HomePageUrl: site.Url,
+		FeedUrl:     fmt.Sprintf("%s/%s", site.Url, "feed.json"),
+		Description: site.Description,
+		Author: &JsonFeedAuthor{
+			Name:   site.Author,
+			Url:    site.Url,
+			Avatar: site.Avatar}}
+	items := make([]*JsonFeedItem, 0)
+	for i := len(posts) - 1; i >= 0 && i >= len(posts)-10; i-- {
+		items = append(items, posts[i].JsonFeedItem())
+	}
+	feed.Items = items
+	bs, err := json.Marshal(feed)
+	if err != nil {
+		panic(err)
+	}
+	err = ioutil.WriteFile(path.Join("static", "feed.json"), []byte(bs), 0777)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Made JSON feed")
+}
+
 func makeBlog(t *template.Template) {
 	posts := findPages("posts")
 	sort.Sort(ByDate(posts))
@@ -346,6 +407,7 @@ func makeBlog(t *template.Template) {
 	}
 	makeBlogPages(t, posts)
 	makeFeed(posts)
+	makeJsonFeed(posts)
 }
 
 type PostMetadata struct {
