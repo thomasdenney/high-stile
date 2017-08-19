@@ -1,4 +1,4 @@
-# High Stile
+![](banner.png)
 
 A static site generator written in Go, aiming to be as minimal as possible. It
 delegates the conversion of Markdown to HTML to [pandoc][], so you will need
