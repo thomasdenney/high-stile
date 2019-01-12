@@ -36,7 +36,7 @@ func markdownToHTML(markdownPath string) (template.HTML, error) {
 			return template.HTML(bs), err
 		}
 	}
-	cmd := exec.Command("pandoc", "-f", "markdown", "-t", "html", markdownPath)
+	cmd := exec.Command("pandoc", "-f", "markdown", "-t", "html5", markdownPath)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err = cmd.Run()
