@@ -147,21 +147,38 @@ func clean() {
 	}
 }
 
-func linkStaticFiles() {
-	files, err := ioutil.ReadDir("public")
+func linkFiles(oldDir, newDir string) error {
+	err := os.MkdirAll(newDir, os.ModePerm)
 	if err != nil {
-		panic(err)
+		return err
 	}
+
+	files, err := ioutil.ReadDir(oldDir)
+	if err != nil {
+		return err
+	}
+
 	for _, file := range files {
-		oldPath := path.Join("public", file.Name())
-		newPath := path.Join("static", file.Name())
-		linkErr := os.Link(oldPath, newPath)
-		if linkErr != nil {
-			panic(linkErr)
+		oldPath := path.Join(oldDir, file.Name())
+		newPath := path.Join(newDir, file.Name())
+
+		if file.IsDir() {
+			linkFiles(oldPath, newPath)
 		} else {
-			fmt.Println("Link", oldPath, "to", newPath)
+			err = os.Link(oldPath, newPath)
+			if err != nil {
+				return err
+			} else {
+				fmt.Println("Link", oldPath, "to", newPath)
+			}
 		}
 	}
+
+	return nil
+}
+
+func linkStaticFiles() {
+	linkFiles("public", "static")
 }
 
 func findPages(dir string) []Page {
