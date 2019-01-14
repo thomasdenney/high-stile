@@ -39,7 +39,6 @@ func markdownToHTML(markdownPath string, flags []string) (template.HTML, error) 
 	arguments := []string{"-f", "markdown", "-t", "html5"}
 	arguments = append(arguments, flags...)
 	arguments = append(arguments, markdownPath)
-	fmt.Println(arguments)
 	cmd := exec.Command("pandoc", arguments...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
