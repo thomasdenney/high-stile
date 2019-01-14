@@ -22,7 +22,7 @@ var ignoreCache = flag.Bool("ignore-cache", false, "Ignores any cached HTML file
 
 var newPostName string
 
-func markdownToHTML(markdownPath string) (template.HTML, error) {
+func markdownToHTML(markdownPath string, flags []string) (template.HTML, error) {
 	mdStat, _ := os.Stat(markdownPath)
 	dir := path.Dir(markdownPath)
 	cacheDir := path.Join(dir, "_cache")
@@ -36,7 +36,11 @@ func markdownToHTML(markdownPath string) (template.HTML, error) {
 			return template.HTML(bs), err
 		}
 	}
-	cmd := exec.Command("pandoc", "-f", "markdown", "-t", "html5", markdownPath)
+	arguments := []string{"-f", "markdown", "-t", "html5"}
+	arguments = append(arguments, flags...)
+	arguments = append(arguments, markdownPath)
+	fmt.Println(arguments)
+	cmd := exec.Command("pandoc", arguments...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err = cmd.Run()
@@ -81,6 +85,7 @@ type Page struct {
 	Prev        *Page
 	Next        *Page
 	ShowHistory bool
+	PandocFlags []string
 }
 
 type ByDate []Page
@@ -195,9 +200,21 @@ func findPages(dir string) []Page {
 
 			var page Page
 
+			jsonPath := path.Join(dir, justName+".json")
+			if _, existsErr := os.Stat(jsonPath); existsErr == nil {
+				jsonContents, err := ioutil.ReadFile(jsonPath)
+				if err != nil {
+					panic(err)
+				}
+				jsonErr := json.Unmarshal(jsonContents, &page)
+				if jsonErr != nil {
+					panic(jsonErr)
+				}
+			}
+
 			//Parse Markdown, if necessary
 			if path.Ext(fileName) == ".md" {
-				contents, err := markdownToHTML(fullPath)
+				contents, err := markdownToHTML(fullPath, page.PandocFlags)
 				if err != nil {
 					panic(err)
 				}
@@ -214,26 +231,14 @@ func findPages(dir string) []Page {
 			page.Path = justName
 			page.IsHomepage = false
 
-			jsonPath := path.Join(dir, justName+".json")
-			if _, existsErr := os.Stat(jsonPath); existsErr == nil {
-				jsonContents, err := ioutil.ReadFile(jsonPath)
+			// Resolve dependencies
+			if page.HeaderPath != "" {
+				page.HeaderPath = path.Join(dir, page.HeaderPath)
+				headerContents, err := ioutil.ReadFile(page.HeaderPath)
 				if err != nil {
 					panic(err)
 				}
-				jsonErr := json.Unmarshal(jsonContents, &page)
-				if jsonErr != nil {
-					panic(jsonErr)
-				}
-
-				// Resolve dependencies
-				if page.HeaderPath != "" {
-					page.HeaderPath = path.Join(dir, page.HeaderPath)
-					headerContents, err := ioutil.ReadFile(page.HeaderPath)
-					if err != nil {
-						panic(err)
-					}
-					page.Header = template.HTML(string(headerContents))
-				}
+				page.Header = template.HTML(string(headerContents))
 			}
 
 			pages = append(pages, page)
