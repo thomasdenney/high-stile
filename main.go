@@ -46,8 +46,8 @@ func markdownToHTML(markdownPath string, flags []string) (template.HTML, error) 
 	if err != nil {
 		return "", err
 	}
-	os.MkdirAll(cacheDir, 0777)
-	ioutil.WriteFile(cachePath, out.Bytes(), 0777)
+	os.MkdirAll(cacheDir, os.ModeDir|0755)
+	ioutil.WriteFile(cachePath, out.Bytes(), 0644)
 	return template.HTML(out.String()), nil
 }
 
@@ -145,14 +145,14 @@ func clean() {
 	if removeErr != nil {
 		panic(removeErr)
 	}
-	createErr := os.Mkdir("static", 0777)
+	createErr := os.Mkdir("static", os.ModeDir|0755)
 	if createErr != nil {
 		panic(createErr)
 	}
 }
 
 func linkFiles(oldDir, newDir string) error {
-	err := os.MkdirAll(newDir, os.ModePerm)
+	err := os.MkdirAll(newDir, os.ModeDir|0755)
 	if err != nil {
 		return err
 	}
@@ -256,7 +256,7 @@ func makePages(t *template.Template) {
 
 func writePage(t *template.Template, page Page, outPath string, kind string, links ...string) {
 	outPath = path.Join("static", outPath, "index.html")
-	err := os.MkdirAll(path.Dir(outPath), 0777)
+	err := os.MkdirAll(path.Dir(outPath), os.ModeDir|0755)
 	if err != nil {
 		panic(err)
 	}
@@ -271,7 +271,7 @@ func writePage(t *template.Template, page Page, outPath string, kind string, lin
 	for _, link := range links {
 		link = path.Join("static", link, "index.html")
 		dir := path.Dir(link)
-		os.MkdirAll(dir, 0777)
+		os.MkdirAll(dir, os.ModeDir|0755)
 		os.Link(outPath, link)
 		fmt.Println(" >", link)
 	}
@@ -341,7 +341,7 @@ func makeFeed(posts []Page) {
 	if err != nil {
 		panic(err)
 	}
-	err = ioutil.WriteFile(path.Join("static", "feed.xml"), []byte(rss), 0777)
+	err = ioutil.WriteFile(path.Join("static", "feed.xml"), []byte(rss), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -401,7 +401,7 @@ func makeJsonFeed(posts []Page) {
 	if err != nil {
 		panic(err)
 	}
-	err = ioutil.WriteFile(path.Join("static", "feed.json"), []byte(bs), 0777)
+	err = ioutil.WriteFile(path.Join("static", "feed.json"), []byte(bs), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -451,7 +451,7 @@ func createNewPostFile(title string) {
 
 	bs, err := json.Marshal(meta)
 	if err == nil {
-		ioutil.WriteFile(path.Join("posts", filename+".json"), bs, os.ModePerm)
+		ioutil.WriteFile(path.Join("posts", filename+".json"), bs, 0644)
 		f, err := os.Create(path.Join("posts", filename+".md"))
 		if err == nil {
 			defer f.Close()
