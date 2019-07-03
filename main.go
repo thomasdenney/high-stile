@@ -22,7 +22,7 @@ var ignoreCache = flag.Bool("ignore-cache", false, "Ignores any cached HTML file
 
 var newPostName string
 
-func markdownToHTML(markdownPath string, flags []string) (template.HTML, error) {
+func markdownToHTML(markdownPath string, publicPath string, flags []string) (template.HTML, error) {
 	mdStat, _ := os.Stat(markdownPath)
 	dir := path.Dir(markdownPath)
 	cacheDir := path.Join(dir, "_cache")
@@ -36,7 +36,7 @@ func markdownToHTML(markdownPath string, flags []string) (template.HTML, error) 
 			return template.HTML(bs), err
 		}
 	}
-	arguments := []string{"-f", "markdown", "-t", "html5"}
+	arguments := []string{"--id-prefix=" + publicPath, "-f", "markdown", "-t", "html5"}
 	arguments = append(arguments, flags...)
 	arguments = append(arguments, markdownPath)
 	cmd := exec.Command("pandoc", arguments...)
@@ -213,7 +213,7 @@ func findPages(dir string) []Page {
 
 			//Parse Markdown, if necessary
 			if path.Ext(fileName) == ".md" {
-				contents, err := markdownToHTML(fullPath, page.PandocFlags)
+				contents, err := markdownToHTML(fullPath, justName, page.PandocFlags)
 				if err != nil {
 					panic(err)
 				}
