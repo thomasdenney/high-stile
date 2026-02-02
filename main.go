@@ -76,6 +76,7 @@ func readSiteInfo() {
 type Page struct {
 	Title       string
 	Path        string
+	Slug        string
 	HeaderPath  string
 	Header      template.HTML
 	Contents    template.HTML
@@ -85,6 +86,7 @@ type Page struct {
 	Next        *Page
 	ShowHistory bool
 	PandocFlags []string
+	SkipDate    bool
 }
 
 type ByDate []Page
@@ -106,14 +108,35 @@ func (page Page) Time() time.Time {
 	return t
 }
 
+func (page Page) PostSlug() string {
+	if page.Slug != "" {
+		return page.Slug
+	}
+	return page.Path
+}
+
 func (page Page) PostPath() string {
+	if page.SkipDate {
+		return page.PostSlugPath()
+	}
 	t := page.Time()
-	return fmt.Sprintf("blog/%d/%d/%d/%s", t.Year(), t.Month(), t.Day(), page.Path)
+	return fmt.Sprintf("blog/%d/%d/%d/%s", t.Year(), t.Month(), t.Day(), page.PostSlug())
 }
 
 func (page Page) PostPath2() string {
 	t := page.Time()
-	return fmt.Sprintf("blog/%04d/%02d/%02d/%s", t.Year(), t.Month(), t.Day(), page.Path)
+	return fmt.Sprintf("blog/%04d/%02d/%02d/%s", t.Year(), t.Month(), t.Day(), page.PostSlug())
+}
+
+func (page Page) PostSlugPath() string {
+	return fmt.Sprintf("blog/%s", page.PostSlug())
+}
+
+func (page Page) LinkPath() string {
+	if page.SkipDate {
+		return page.PostSlugPath()
+	}
+	return page.PostPath()
 }
 
 func (page Page) PrettyDate() string {
@@ -132,7 +155,7 @@ func (post Page) PostHTML(t *template.Template) template.HTML {
 func (post Page) FeedItem() *feeds.Item {
 	return &feeds.Item{
 		Title:       post.Title,
-		Link:        &feeds.Link{Href: fmt.Sprintf("%s/%s", site.Url, post.PostPath())},
+		Link:        &feeds.Link{Href: fmt.Sprintf("%s/%s", site.Url, post.LinkPath())},
 		Description: string(post.Contents),
 		Created:     post.Time(),
 		Author: &feeds.Author{
@@ -366,7 +389,7 @@ func (post Page) JsonFeedItem() *JsonFeedItem {
 	return &JsonFeedItem{
 		Id:            post.PostPath(),
 		Title:         post.Title,
-		Url:           fmt.Sprintf("%s/%s", site.Url, post.PostPath()),
+		Url:           fmt.Sprintf("%s/%s", site.Url, post.LinkPath()),
 		ContentHTML:   string(post.Contents),
 		DatePublished: post.Time()}
 }
@@ -424,7 +447,13 @@ func makeBlog(t *template.Template) {
 	for _, post := range posts {
 		post.ShowHistory = true
 		post.Contents = post.PostHTML(t)
-		writePage(t, post, post.PostPath(), "Post", post.PostPath2())
+		if post.Slug != "" {
+			writePage(t, post, post.PostPath(), "Post", post.PostPath2(), post.PostSlugPath())
+		} else if post.SkipDate {
+			writePage(t, post, post.PostSlugPath(), "Post")
+		} else {
+			writePage(t, post, post.PostPath(), "Post", post.PostPath2())
+		}
 	}
 	makeBlogPages(t, posts)
 	makeFeed(posts)
@@ -432,22 +461,30 @@ func makeBlog(t *template.Template) {
 }
 
 type PostMetadata struct {
-	Title string
-	Date  string
+	Title    string
+	Date     string
+	Slug     string
+	SkipDate bool
 }
 
-func createNewPostFile(title string) {
-	d := time.Now()
-	meta := PostMetadata{
-		Title: title,
-		Date:  d.Format("2006-01-02 15:04:05")}
-
+func slugifyTitle(title string) string {
 	filename := strings.ToLower(title)
 	whitespace := regexp.MustCompile(`\s`)
 	filename = whitespace.ReplaceAllString(filename, "-")
 	badChars := regexp.MustCompile(`[^\w\d-]*`)
 	filename = badChars.ReplaceAllString(filename, "")
-	filename = d.Format("2006-01-02") + "-" + filename
+	return filename
+}
+
+func createNewPostFile(title string) {
+	d := time.Now()
+	slug := slugifyTitle(title)
+	meta := PostMetadata{
+		Title: title,
+		Date:  d.Format("2006-01-02 15:04:05"),
+		Slug:  slug}
+
+	filename := d.Format("2006-01-02") + "-" + slug
 
 	bs, err := json.Marshal(meta)
 	if err == nil {
